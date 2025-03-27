@@ -1,0 +1,4 @@
+/.env
+/aws-creds.conf
+/kubeconfig-dot.yaml
+/trust.json

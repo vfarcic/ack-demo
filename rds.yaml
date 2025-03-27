@@ -1,0 +1,248 @@
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: VPC
+metadata:
+  name: my-db
+  annotations:
+    services.k8s.aws/region: us-east-1
+spec:
+  cidrBlocks:
+    - "11.0.0.0/16"
+  enableDNSSupport: true
+  enableDNSHostnames: true
+  tags:
+    - key: name
+      value: my-db
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: InternetGateway
+metadata:
+  name: my-db
+  annotations:
+    services.k8s.aws/region: us-east-1
+spec:
+  vpcRef:
+    from:
+      name: my-db
+  tags:
+    - key: name
+      value: my-db
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: RouteTable
+metadata:
+  name: my-db
+  annotations:
+    services.k8s.aws/region: us-east-1
+spec:
+  vpcRef:
+    from:
+      name: my-db
+  # associations:
+  #   main: true
+  routes:
+    - destinationCIDRBlock: "0.0.0.0/0"
+      gatewayRef:
+        from:
+          name: my-db
+  tags:
+    - key: name
+      value: my-db
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: SecurityGroup
+metadata:
+  name: my-db
+  annotations:
+    services.k8s.aws/region: us-east-1
+spec:
+  name: my-db
+  description: I am too lazy to write descriptions
+  vpcRef:
+    from:
+      name: my-db
+  ingressRules:
+    - fromPort: 5432
+      toPort: 5432
+      ipProtocol: tcp
+      ipRanges:
+        - cidrIP: "0.0.0.0/0"
+          description: I am too lazy to write descriptions
+  tags:
+    - key: name
+      value: my-db
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: Subnet
+metadata:
+  name: my-db-a
+  annotations:
+    services.k8s.aws/region: us-east-1
+spec:
+  availabilityZone: us-east-1a
+  cidrBlock: "11.0.0.0/24"
+  vpcRef:
+    from:
+      name: my-db
+  routeTableRefs:
+    - from:
+        name: my-db
+  tags:
+    - key: name
+      value: my-db
+    - key: zone
+      value: us-east1a
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: Subnet
+metadata:
+  name: my-db-b
+  annotations:
+    services.k8s.aws/region: us-east-1
+spec:
+  availabilityZone: us-east-1b
+  cidrBlock: "11.0.1.0/24"
+  vpcRef:
+    from:
+      name: my-db
+  routeTableRefs:
+    - from:
+        name: my-db
+  tags:
+    - key: name
+      value: my-db
+    - key: zone
+      value: us-east1b
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: Subnet
+metadata:
+  name: my-db-c
+  annotations:
+    services.k8s.aws/region: us-east-1
+spec:
+  availabilityZone: us-east-1c
+  cidrBlock: "11.0.2.0/24"
+  vpcRef:
+    from:
+      name: my-db
+  routeTableRefs:
+    - from:
+        name: my-db
+  tags:
+    - key: name
+      value: my-db
+    - key: zone
+      value: us-east1c
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: Subnet
+metadata:
+  name: my-db-x
+  annotations:
+    services.k8s.aws/region: us-east-1
+spec:
+  availabilityZone: us-east-1x
+  cidrBlock: "11.0.3.0/24"
+  vpcRef:
+    from:
+      name: my-db
+  routeTableRefs:
+    - from:
+        name: my-db
+  tags:
+    - key: name
+      value: my-db
+    - key: zone
+      value: us-east1x
+---
+apiVersion: rds.services.k8s.aws/v1alpha1
+kind: DBSubnetGroup
+metadata:
+  name: my-db
+  annotations:
+    services.k8s.aws/region: us-east-1
+spec:
+  name: my-db
+  description: I am too lazy to write descriptions
+  subnetRefs:
+    - from:
+        name: my-db-a
+    - from:
+        name: my-db-b
+    - from:
+        name: my-db-c
+---
+apiVersion: rds.services.k8s.aws/v1alpha1
+kind: DBInstance
+metadata:
+  name: my-db
+  annotations:
+    services.k8s.aws/region: us-east-1
+spec:
+  dbSubnetGroupRef:
+    from:
+      name: my-db
+  vpcSecurityGroupRefs:
+    - from:
+        name: my-db
+  masterUsername: masteruser
+  engine: postgres
+  # skipFinalSnapshot: true
+  publiclyAccessible: true
+  allocatedStorage: 200
+  masterUserPassword:
+    key: password
+    name: my-db
+  storageEncrypted: true
+  dbInstanceIdentifier: my-db
+  dbInstanceClass: db.m5.large
+  engineVersion: "16.3"
+---
+apiVersion: services.k8s.aws/v1alpha1
+kind: FieldExport
+metadata:
+  name: my-db-username
+spec:  
+  to:
+    name: my-db
+    kind: secret
+    key: username
+  from:
+    path: .spec.masterUsername
+    resource:
+      group: rds.services.k8s.aws
+      kind: dbinstance
+      name: my-db
+---
+apiVersion: services.k8s.aws/v1alpha1
+kind: FieldExport
+metadata:
+  name: my-db-endpoint
+spec:  
+  to:
+    name: my-db
+    kind: secret
+    key: endpoint
+  from:
+    path: .status.endpoint.address
+    resource:
+      group: rds.services.k8s.aws
+      kind: dbinstance
+      name: my-db
+---
+apiVersion: services.k8s.aws/v1alpha1
+kind: FieldExport
+metadata:
+  name: my-db-port
+spec:  
+  to:
+    name: my-db
+    kind: secret
+    key: port
+  from:
+    path: .status.endpoint.port
+    resource:
+      group: rds.services.k8s.aws
+      kind: dbinstance
+      name: my-db
