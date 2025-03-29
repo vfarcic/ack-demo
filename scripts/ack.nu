@@ -26,11 +26,33 @@ def --env "main apply ack" [
             public.ecr.aws
     )
 
+    mut aws_account_id = ""
+    if AWS_ACCOUNT_ID in $env {
+        $aws_account_id = $env.AWS_ACCOUNT_ID
+    } else {
+        $aws_account_id = (
+            aws sts get-caller-identity --query "Account"
+                --output text
+        )
+    }
+
+    mut oidc_provider = ""
+    if OIDC_PROVIDER in $env {
+        $oidc_provider = $env.OIDC_PROVIDER
+    } else {
+        $oidc_provider = (
+            aws eks describe-cluster --name $name --region $region
+                --query "cluster.identity.oidc.issuer"
+                --output text | str replace "https://" ""
+        )
+    }
+
     let controllers = [
         {name: "ec2", version: "1.3.7"},
         {name: "rds", version: "1.4.14"},
     ]
     for controller in $controllers {
+
         (
             helm upgrade --install
                 $"ack-($controller.name)-controller"
@@ -39,6 +61,32 @@ def --env "main apply ack" [
                 --create-namespace --namespace ack-system
                 --set aws.region=us-east-1
         )
+
+        {
+            Version: "2012-10-17",
+            Statement: [
+                {
+                    Effect: "Allow",
+                    Principal: {
+                        Federated: $"arn:aws:iam::($aws_account_id):oidc-provider/($oidc_provider)"
+                    },
+                    "Action": "sts:AssumeRoleWithWebIdentity",
+                    "Condition": {
+                        "StringEquals": {
+                            $"($oidc_provider):sub": $"system:serviceaccount:ack-system:ack-($controller.name)-controller"
+                        }
+                    }
+                }
+            ]
+        } | to json | save trust.json --force
+
+        (
+            aws iam create-role
+                --role-name $"ack-($controller.name)-controller"
+                --assume-role-policy-document file://trust.json
+                --description $"IRSA role for ACK ($controller.name) controller deployment on EKS cluster using Helm charts"
+        )
+
     }
 
 }

@@ -14,7 +14,7 @@ def "main setup" [] {
 
     kubectl create namespace a-team
 
-    # main apply ack
+    main apply ack
 
     main print source
     
