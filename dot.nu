@@ -2,6 +2,7 @@
 
 source  scripts/common.nu
 source  scripts/kubernetes.nu
+source  scripts/ack.nu
 
 def main [] {}
 
@@ -12,6 +13,8 @@ def "main setup" [] {
     main create kubernetes aws
 
     kubectl create namespace a-team
+
+    # main apply ack
 
     main print source
     

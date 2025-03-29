@@ -170,15 +170,17 @@ def "main destroy kubernetes" [
     
     } else if $provider == "aws" {
 
+        let region = "us-east-1"
+
         (
             eksctl delete addon --name aws-ebs-csi-driver
-                --cluster $name --region us-east-1
+                --cluster $name --region $region
         )
 
         (
             eksctl delete nodegroup --name primary
                 --cluster $name --drain=false
-                --region us-east-1 --parallel 10 --wait
+                --region $region --parallel 10 --wait
         )
 
         (
@@ -432,6 +434,8 @@ def --env "create eks" [
     --node_size = "small" # Supported values: small, medium, large
 ] {
 
+    let region = "us-east-1"
+
     mut aws_access_key_id = ""
     if AWS_ACCESS_KEY_ID in $env {
         $aws_access_key_id = $env.AWS_ACCESS_KEY_ID
@@ -474,7 +478,7 @@ aws_secret_access_key = ($aws_secret_access_key)
         kind: "ClusterConfig"
         metadata: {
             name: $name
-            region: "us-east-1"
+            region: $region
             version: "1.31"
         }
         managedNodeGroups: [{
@@ -501,12 +505,25 @@ aws_secret_access_key = ($aws_secret_access_key)
         eksctl create addon --name aws-ebs-csi-driver
             --cluster $name
             --service-account-role-arn $"arn:aws:iam::($aws_account_id):role/AmazonEKS_EBS_CSI_DriverRole"
-            --region us-east-1 --force
+            --region $region --force
     )
 
     (
         kubectl patch storageclass gp2
             --patch '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
     )
+
+    # (
+    #     eksctl utils associate-iam-oidc-provider --cluster $name
+    #         --region $region --approve
+    # )
+
+    # let oidc_provider = (
+    #     aws eks describe-cluster --name $name --region $region
+    #         --query "cluster.identity.oidc.issuer"
+    #         --output text | str replace "https://" ""
+    # )
+    # $"export OIDC_PROVIDER=($oidc_provider)\n"
+    #     | save --append .env
 
 }
