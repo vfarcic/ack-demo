@@ -225,7 +225,7 @@ def --env "main apply crossplane" [
             }
         } | to yaml | kubectl apply --filename -
 
-        wait crossplane
+        main wait crossplane
 
         {
             apiVersion: "kubernetes.crossplane.io/v1alpha1"
@@ -402,7 +402,7 @@ def "apply providerconfig" [
 
 }
 
-def "wait crossplane" [] {
+def "main wait crossplane" [] {
 
     print $"\n(ansi yellow_bold)Waiting for Crossplane providers to be deployed...(ansi reset)\n"
 

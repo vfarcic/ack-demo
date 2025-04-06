@@ -24,6 +24,13 @@ def "main setup" [] {
         --filename crossplane-providers/
     )
 
+    main wait crossplane
+
+    (
+        kubectl --namespace crossplane-system apply
+        --filename crossplane-configs/
+    )
+
     (
         kubectl --namespace crossplane-system apply
             --filename crossplane-package/
