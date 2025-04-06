@@ -1,6 +1,8 @@
 #!/usr/bin/env nu
 
 def --env "main apply ack" [
+    --cluster_name = "dot"
+    --region = "us-east-1"
 ] {
 
     print $"\nApplying (ansi yellow_bold)ACK Controllers(ansi reset)...\n"
@@ -41,7 +43,8 @@ def --env "main apply ack" [
         $oidc_provider = $env.OIDC_PROVIDER
     } else {
         $oidc_provider = (
-            aws eks describe-cluster --name $name --region $region
+            aws eks describe-cluster --name $cluster_name
+                --region $region
                 --query "cluster.identity.oidc.issuer"
                 --output text | str replace "https://" ""
         )
@@ -53,9 +56,10 @@ def --env "main apply ack" [
     ]
     for controller in $controllers {
 
+        let ack_controller_iam_role = $"ack-($controller.name)-controller"
+
         (
-            helm upgrade --install
-                $"ack-($controller.name)-controller"
+            helm upgrade --install $ack_controller_iam_role
                 oci://public.ecr.aws/aws-controllers-k8s/($controller.name)-chart
                 $"--version=($controller.version)"
                 --create-namespace --namespace ack-system
@@ -73,20 +77,92 @@ def --env "main apply ack" [
                     "Action": "sts:AssumeRoleWithWebIdentity",
                     "Condition": {
                         "StringEquals": {
-                            $"($oidc_provider):sub": $"system:serviceaccount:ack-system:ack-($controller.name)-controller"
+                            $"($oidc_provider):sub": $"system:serviceaccount:ack-system:($ack_controller_iam_role)"
                         }
                     }
                 }
             ]
         } | to json | save trust.json --force
 
-        (
+        do --ignore-errors {(
             aws iam create-role
-                --role-name $"ack-($controller.name)-controller"
+                --role-name $ack_controller_iam_role
                 --assume-role-policy-document file://trust.json
                 --description $"IRSA role for ACK ($controller.name) controller deployment on EKS cluster using Helm charts"
+        )}
+
+        let policy_arns = get policy_arns
+
+        for policy_arn in $policy_arns {
+            do --ignore-errors {(
+            aws iam attach-role-policy
+                --role-name $ack_controller_iam_role
+                --policy-arn $policy_arn
+            )}
+        }
+
+        let role_arn = (
+            aws iam get-role --role-name $ack_controller_iam_role
+                --query Role.Arn --output text
+        )
+
+        (
+            kubectl --namespace ack-system
+                annotate serviceaccount $ack_controller_iam_role
+                $"eks.amazonaws.com/role-arn=($role_arn)"
+        )
+
+        (
+            kubectl --namespace ack-system
+                rollout restart deployment
+                $"($ack_controller_iam_role)-($controller.name)-chart"
+        )
+
+        (
+            kubectl --namespace ack-system wait
+                --for=condition=ready pods
+                --selector $"app.kubernetes.io/instance=($ack_controller_iam_role)"
         )
 
     }
+
+}
+
+def --env "main delete ack" [] {
+
+    let controllers = [
+        "ec2",
+        "rds"
+    ]
+    for controller in $controllers {
+
+        let ack_controller_iam_role = $"ack-($controller)-controller"
+
+        let policy_arns = get policy_arns
+
+        for policy_arn in $policy_arns {
+            
+        do --ignore-errors {(
+            aws iam detach-role-policy
+                --role-name ($ack_controller_iam_role)
+                --policy-arn ($policy_arn)
+            )}
+        }
+
+        aws iam delete-role --role-name $ack_controller_iam_role
+
+    }
+
+}
+
+def "get policy_arns" [
+    --controller = "ec2"
+] {
+    
+    let base_url = $"https://raw.githubusercontent.com/aws-controllers-k8s/($controller)-controller/main"
+
+    let policy_arn_url = $"($base_url)/config/iam/recommended-policy-arn"
+
+    http get $policy_arn_url | lines
 
 }
