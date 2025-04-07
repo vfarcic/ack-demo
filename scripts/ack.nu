@@ -91,15 +91,15 @@ def --env "main apply ack" [
                 --description $"IRSA role for ACK ($controller.name) controller deployment on EKS cluster using Helm charts"
         )}
 
-        let policy_arns = get policy_arns
+        let policy_arns = (
+            get policy_arns --controller $controller.name
+        )
 
-        for policy_arn in $policy_arns {
-            do --ignore-errors {(
+        for policy_arn in $policy_arns {(
             aws iam attach-role-policy
                 --role-name $ack_controller_iam_role
                 --policy-arn $policy_arn
-            )}
-        }
+        )}
 
         let role_arn = (
             aws iam get-role --role-name $ack_controller_iam_role
@@ -138,7 +138,9 @@ def --env "main delete ack" [] {
 
         let ack_controller_iam_role = $"ack-($controller)-controller"
 
-        let policy_arns = get policy_arns
+        let policy_arns = (
+            get policy_arns --controller $controller
+        )
 
         for policy_arn in $policy_arns {
             

@@ -38,8 +38,6 @@ spec:
   vpcRef:
     from:
       name: my-db
-  # associations:
-  #   main: true
   routes:
     - destinationCIDRBlock: "0.0.0.0/0"
       gatewayRef:
@@ -188,12 +186,11 @@ spec:
         name: my-db
   masterUsername: masteruser
   engine: postgres
-  # skipFinalSnapshot: true
   publiclyAccessible: true
   allocatedStorage: 200
   masterUserPassword:
     key: password
-    name: my-db
+    name: my-db-password
   storageEncrypted: true
   dbInstanceIdentifier: my-db
   dbInstanceClass: db.m5.large
