@@ -15,6 +15,8 @@ def "main setup" [] {
 
     kubectl create namespace a-team
 
+    kubectl --namespace a-team apply --filename rds-password.yaml
+
     main apply ack
 
     main apply crossplane --preview true --provider aws
