@@ -7,9 +7,6 @@ spec:
   version: "16.3"
   size: medium
   region: us-east-1
-  databases:
-    - db-01
-    - db-02
   crossplane:
     compositionSelector:
       matchLabels:
