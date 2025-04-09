@@ -22,21 +22,18 @@ def "main setup" [] {
     main apply crossplane --preview true --provider aws
 
     (
-        kubectl --namespace crossplane-system apply
-        --filename crossplane-providers/
+        kubectl apply 
+            --filename crossplane-providers/cluster-role.yaml
     )
+
+    (
+        kubectl apply
+            --filename crossplane-providers/provider-kubernetes-incluster.yaml
+    )
+
+    kubectl apply --filename dot-sql-config.yaml
 
     main wait crossplane
-
-    (
-        kubectl --namespace crossplane-system apply
-        --filename crossplane-configs/
-    )
-
-    (
-        kubectl --namespace crossplane-system apply
-            --filename crossplane-package/
-    )
 
     main print source
     
